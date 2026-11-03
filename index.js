@@ -22,12 +22,48 @@ app.use(express.static('public'));
 app.use(bodyparser.urlencoded({extended: true}));
 
 //marsruudid
-app.get('/', (req, res)=>{
+app.get('/', async (req, res)=>{
 	const dayNow = dateET.day();
 	const dateNow = dateET.fullDate(0);
 	const timeNow = dateET.fullTime();
+	let conn;
+	try {
+		let sqlReq = "SELECT filename, alttext FROM galleryphotos WHERE id=(SELECT MAX(id) FROM galleryphotos WHERE privacy=? AND deleted IS NULL)";
+		const privacy = 3;
+		conn = await mysql.createConnection({
+			host: process.env.DB_HOST,
+			user: process.env.DB_USER,
+			password: process.env.DB_PASS,
+			database: process.env.DB_NAME
+		});
+		const [rows, fields] = await conn.execute(sqlReq, [privacy]);
+		let imgAlt = "Avalik foto";
+		if(rows[0].alttext != ""){
+			imgAlt = rows[0].alttext;
+		}
+		res.render('index', {dayNow: dayNow, dateNow: dateNow, timeNow: timeNow, imgFile: "gallery/normal/" + rows[0].filename, imgAlt: imgAlt});
+	}
+	catch (err) {
+		res.render('index', {dayNow: dayNow, dateNow: dateNow, timeNow: timeNow, imgFile: "pic/vp_logo_small.png", imgAlt: "VP logo"});
+	}
+	finally {
+		if(conn){
+			await conn.end();
+			//console.log("Andmebaasiühendus suletud!");
+		}
+	}
 	//res.send('Express.js veeb läkski käima!');
-	res.render('index', {dayNow: dayNow, dateNow: dateNow, timeNow: timeNow});
+	
+});
+
+//sisseloginud kasutajate avaleht
+app.get('/home', (req, res) => {
+	res.render('home');
+});
+
+//väljalogimine
+app.get('/logout', (req, res) => {
+	res.redirect('/');
 });
 
 app.get('/vanasona', async (req, res)=>{
@@ -66,5 +102,13 @@ app.use('/eestifilm', eestiFilmRouter);
 //galeriipiltide üleslaadimine
 const galleryPhotoUploadRouter = require('./routes/galleryPhotoUploadRoutes');
 app.use('/galleryPhotoUpload', galleryPhotoUploadRouter);
+
+//kasutajakonto loomine
+const signupRouter = require('./routes/signupRoutes');
+app.use('/signup', signupRouter);
+
+//sisselogimine
+const signinRouter = require('./routes/signinRoutes');
+app.use('/signin', signinRouter);
 
 app.listen(5200);
