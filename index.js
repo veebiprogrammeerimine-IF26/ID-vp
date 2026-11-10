@@ -6,7 +6,9 @@ const bodyparser = require('body-parser');
 const mysql = require('mysql2/promise');
 //moodul .env keskkonnam,uutujate lugemiseks
 require('dotenv').config();
+const session = require('express-session');
 
+const loginCheck = require('./src/checkLogin');
 const dateET = require('./src/dateTimeET');
 
 const textRef = "public/txt/vanasonad.txt";
@@ -14,6 +16,8 @@ const regtextRef = "public/txt/visits.txt";
 
 //käivitan funktsiooni express() ja annan nimeks app
 const app = express();
+//võtame kasutusele sessioonihalduri
+app.use(session({secret: process.env.SES_SECRET, saveUninitialized: false, resave: true}));
 //määrame renderdusmootori: EJS
 app.set('view engine', 'ejs');
 //määrame avalikuna kasutatava kataloogi
@@ -57,12 +61,14 @@ app.get('/', async (req, res)=>{
 });
 
 //sisseloginud kasutajate avaleht
-app.get('/home', (req, res) => {
+app.get('/home', loginCheck.isLogin, (req, res) => {
 	res.render('home');
 });
 
 //väljalogimine
 app.get('/logout', (req, res) => {
+	//hävitame sessiooni
+	req.session.destroy();
 	res.redirect('/');
 });
 
@@ -102,6 +108,9 @@ app.use('/eestifilm', eestiFilmRouter);
 //galeriipiltide üleslaadimine
 const galleryPhotoUploadRouter = require('./routes/galleryPhotoUploadRoutes');
 app.use('/galleryPhotoUpload', galleryPhotoUploadRouter);
+
+const galleryRouter = require('./routes/galleryRoutes');
+app.use('/gallery', galleryRouter);
 
 //kasutajakonto loomine
 const signupRouter = require('./routes/signupRoutes');
